@@ -147,7 +147,8 @@
 
         const player = state.player;
         const totals = state.totals || {};
-        const currentSeason = state.seasons?.length || 0;
+        const seasons = state.seasons || [];
+        const currentSeason = seasons.length || 0;
 
         // 1) OVR forzado a 99 (solo Modo Dios)
         if (config.forceOVR99 && player.overall !== 99) {
@@ -155,14 +156,22 @@
         }
 
         // 2) Stats infladas: solo cuando entramos a una nueva temporada
-        // Sumar N goles y M asist por temporada, sin multiplicar las existentes
-        if (config.inflateStats && totals && currentSeason > lastSeasonIndex) {
+        // Sumar N goles y M asist por temporada, tanto en totals como en la season actual
+        if (config.inflateStats && currentSeason > lastSeasonIndex) {
             lastSeasonIndex = currentSeason;
             if (currentSeason > 0) {
-                // Sumamos a los totales acumulados
+                // Parchar la última temporada agregada (la actual)
+                const lastSeason = seasons[seasons.length - 1];
+                if (lastSeason && lastSeason.stats) {
+                    lastSeason.stats.goals = (lastSeason.stats.goals || 0) + config.goalsPerSeason;
+                    lastSeason.stats.assists = (lastSeason.stats.assists || 0) + config.assistsPerSeason;
+                    console.log('[99] temporada #' + currentSeason + ' stats: +' + config.goalsPerSeason + ' goles, +' + config.assistsPerSeason + ' asist');
+                }
+
+                // Los totales se recalculan automáticamente al renderizar
+                // (ut() suma seasons[i].stats.goals), pero por si acaso lo forzamos
                 totals.goals = (totals.goals || 0) + config.goalsPerSeason;
                 totals.assists = (totals.assists || 0) + config.assistsPerSeason;
-                console.log('[99] temporada #' + currentSeason + ': +' + config.goalsPerSeason + ' goles, +' + config.assistsPerSeason + ' asist');
             }
         }
 
