@@ -2,7 +2,7 @@
 
 Script de Tampermonkey con cheats configurables para el [Simulador de Carrera de Copero](https://copero.com.ar/juegos/simulador-carrera).
 
-Incluye OVR 99, progresión rápida, anti-lesiones, modo joven eterno, auto-decisión de eventos y mucho más. Todo configurable desde un panel flotante en el juego.
+Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Normal+** (suma goles y asist cada temporada). Todo configurable desde un panel flotante en el juego.
 
 ## 🎯 Funcionalidades
 
@@ -10,23 +10,15 @@ Incluye OVR 99, progresión rápida, anti-lesiones, modo joven eterno, auto-deci
 
 | Modo | Descripción |
 |------|-------------|
-| 🏆 **Modo Dios** | OVR 99 desde el inicio, nunca lesionas, stats infladas |
-| 📈 **Realista +99** | Arranca con OVR bajo pero sube rápido temporada a temporada |
-| ⚽ **Goleador** | Stats infladas para que el OVR suba por cálculo natural |
-| 💀 **Inmortal** | Nunca te lesionás, stats infladas, OVR sube rápido |
-| 👶 **Joven Eterno** | Edad congelada en 16, OVR 99, stats infladas, sin retiro |
+| 🏆 **Modo Dios** | OVR siempre en 99, sin lesiones |
+| ⚽ **Modo Normal+** | Arranca con stats reales, suma goles/asist configurables cada temporada |
 | ⚙️ **Personalizado** | Configurá cada opción a tu gusto |
 
 ### Opciones individuales
 
 - **OVR siempre en 99**: fuerza el overall a 99 constantemente
-- **Subida gradual por temporada**: el OVR sube +X puntos por temporada (más realista)
-- **Inflar stats (goles/asist)**: multiplica las estadísticas para que el OVR suba naturalmente
+- **Sumar goles/asist por temporada**: añade una cantidad fija de goles y asistencias a tus totales cada vez que avanzás una temporada (por defecto +10 goles y +5 asist)
 - **Prevenir lesiones**: cancela cualquier lesión activa
-- **Prevenir retiro**: bloquea el evento de retiro
-- **Edad congelada**: mantiene la edad en 16 para siempre
-- **Auto-decidir eventos**: elige automáticamente la mejor opción en cada decisión
-- **Forzar outcomes positivos**: sesga las decisiones hacia resultados favorables
 
 ## 📋 Requisitos
 
@@ -57,32 +49,21 @@ Incluye OVR 99, progresión rápida, anti-lesiones, modo joven eterno, auto-deci
 4. Inicia una nueva carrera
 5. El panel se puede arrastrar y cerrar (vuelve a aparecer con el botón 🏆)
 
-## 🔍 Comprobar que funciona
-
-1. Abre DevTools (`F12` o `Cmd+Opt+I`)
-2. Ve a la pestaña **Consola**
-3. Deberías ver: `[99] v2.0 cargado. Config: ...`
-4. El panel flotante debe aparecer en la esquina superior derecha
-
 ## 🛠️ ¿Cómo funciona técnicamente?
 
-El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall`, `player.age`, `totals.*`) vive en el cierre del componente `CareerSimulatorPage`, no en `localStorage` ni en `window`.
+El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall` y `totals.*`) vive en el cierre del componente `CareerSimulatorPage`, no en `localStorage` ni en `window`.
 
-El bundle del juego (`CareerSimulatorPage-EiQXNFBI.js`) tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 puntos críticos que limitan el OVR a un máximo de 99. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules, que no pasa por `window.fetch`.
+El bundle del juego tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 puntos críticos que limitan el OVR a un máximo de 99. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules.
 
 **Este script evita todo eso** yendo directamente al Fiber de React:
 
 1. Busca el elemento `<div data-career-phase="...">` que renderiza la carrera
 2. Encuentra el Fiber de React asociado (mediante `__reactFiber$xxx`)
 3. Recorre los hooks `useState` buscando el que contiene `player.overall`
-4. Modifica el estado directamente: `player.overall`, `player.age`, `totals.*`, etc.
+4. Modifica el estado directamente: `player.overall`, `totals.goals`, `totals.assists`, etc.
 5. Vuelve a aplicarlo cada 500 ms porque React reemplaza el estado en cada renderizado
 
-Además, el script:
-
-- Construye un panel UI flotante inyectando HTML y CSS al DOM
-- Persiste la configuración del usuario en `localStorage` (compatible con `GM_setValue`)
-- Detecta eventos automáticamente y elige la mejor opción según heurística
+Para el **Modo Normal+**, el script detecta cuándo avanzás una temporada (cuando `state.seasons.length` aumenta) y suma una cantidad fija de goles y asist a tus totales. Esto hace que el OVR suba naturalmente por el cálculo interno del juego, sin necesidad de forzarlo a 99.
 
 ## 📁 Estructura del repositorio
 
@@ -95,9 +76,7 @@ copero-99-ovr/
 └── .gitignore
 ```
 
-## 🎮 Capturas de pantalla
-
-### Panel flotante
+## 🎮 Captura del panel
 
 ```
 ┌─────────────────────────────────┐
@@ -108,13 +87,10 @@ copero-99-ovr/
 │                                  │
 │ Opciones:                        │
 │ ☑ OVR siempre en 99            │
-│ ☐ Subida gradual por temporada │
-│ ☑ Inflar stats (goles/asist)   │
+│ ☐ Sumar goles/asist por temp   │
+│   Goles/temp: [10]              │
+│   Asist/temp: [5]               │
 │ ☑ Prevenir lesiones            │
-│ ☑ Prevenir retiro              │
-│ ☐ Edad congelada               │
-│ ☑ Auto-decidir eventos         │
-│ ☑ Forzar outcomes positivos    │
 └─────────────────────────────────┘
 ```
 
