@@ -7,7 +7,7 @@ Thumbs.db
 *.swo
 *~
 
-# Node (por si en el futuro se agrega tooling)
+# Node (por si en el futuro se añade tooling)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -16,7 +16,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Build artifacts
+# Artefactos de build
 dist/
 build/
 *.min.js
