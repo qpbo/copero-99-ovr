@@ -23,9 +23,9 @@
 
         // Opciones individuales
         forceOVR99: true,           // Modo Dios: OVR siempre en 99
-        inflateStats: false,        // Modo Normal: inflar goles y asist
-        goalsPerSeason: 10,         // Goles "extra" por temporada (sumar a los reales)
-        assistsPerSeason: 5,        // Asistencias "extra" por temporada
+        gradualOVR: false,          // Modo Normal: subir OVR por temporada
+        ovrPerSeason: 5,            // Cuantos puntos sube por temporada
+        startingOVR: 50,            // OVR mínimo (no baja de aca)
         preventInjuries: true,      // Cancelar lesiones
     };
 
@@ -68,15 +68,15 @@
             config: { ...DEFAULT_CONFIG, preset: 'god' }
         },
         normal: {
-            name: 'Modo Normal +',
-            description: 'Arranca con stats bajas y suma goles/asist cada temporada',
+            name: 'Modo Normal+',
+            description: 'Sube X puntos de OVR cada temporada (parte de 50)',
             config: {
                 ...DEFAULT_CONFIG,
                 preset: 'normal',
                 forceOVR99: false,
-                inflateStats: true,
-                goalsPerSeason: 10,
-                assistsPerSeason: 5,
+                gradualOVR: true,
+                ovrPerSeason: 5,
+                startingOVR: 50,
                 preventInjuries: true,
             }
         },
@@ -146,7 +146,6 @@
         if (!state || !state.player) return;
 
         const player = state.player;
-        const totals = state.totals || {};
         const seasons = state.seasons || [];
         const currentSeason = seasons.length || 0;
 
@@ -155,23 +154,16 @@
             player.overall = 99;
         }
 
-        // 2) Stats infladas: solo cuando entramos a una nueva temporada
-        // Sumar N goles y M asist por temporada, tanto en totals como en la season actual
-        if (config.inflateStats && currentSeason > lastSeasonIndex) {
-            lastSeasonIndex = currentSeason;
-            if (currentSeason > 0) {
-                // Parchar la última temporada agregada (la actual)
-                const lastSeason = seasons[seasons.length - 1];
-                if (lastSeason && lastSeason.stats) {
-                    lastSeason.stats.goals = (lastSeason.stats.goals || 0) + config.goalsPerSeason;
-                    lastSeason.stats.assists = (lastSeason.stats.assists || 0) + config.assistsPerSeason;
-                    console.log('[99] temporada #' + currentSeason + ' stats: +' + config.goalsPerSeason + ' goles, +' + config.assistsPerSeason + ' asist');
-                }
+        // 2) OVR gradual (Modo Normal+)
+        // Sube X puntos por temporada, sin importar decisiones
+        if (config.gradualOVR) {
+            // Calculamos el OVR objetivo segun la temporada actual
+            const targetOVR = Math.min(99, config.startingOVR + (currentSeason * config.ovrPerSeason));
 
-                // Los totales se recalculan automáticamente al renderizar
-                // (ut() suma seasons[i].stats.goals), pero por si acaso lo forzamos
-                totals.goals = (totals.goals || 0) + config.goalsPerSeason;
-                totals.assists = (totals.assists || 0) + config.assistsPerSeason;
+            if (player.overall < targetOVR) {
+                player.overall = targetOVR;
+            } else if (player.overall > 99) {
+                player.overall = 99;
             }
         }
 
@@ -318,7 +310,7 @@
             <div class="section-title">Modo predefinido</div>
             <select class="preset-select" id="copero99-preset">
                 <option value="god">Modo Dios</option>
-                <option value="normal">Modo Normal +</option>
+                <option value="normal">Modo Normal+</option>
                 <option value="custom">Personalizado</option>
             </select>
             <div class="section-title">Opciones</div>
@@ -326,15 +318,15 @@
                 <input type="checkbox" data-key="forceOVR99"> OVR siempre en 99
             </label>
             <label class="option">
-                <input type="checkbox" data-key="inflateStats"> Sumar goles/asist por temporada
+                <input type="checkbox" data-key="gradualOVR"> Subir OVR por temporada
             </label>
             <label class="option" style="padding-left: 24px;">
-                <span style="opacity: 0.7;">Goles/temp:</span>
-                <input type="number" class="number-input" data-key="goalsPerSeason" min="0" max="50">
+                <span style="opacity: 0.7;">OVR inicial:</span>
+                <input type="number" class="number-input" data-key="startingOVR" min="40" max="99">
             </label>
             <label class="option" style="padding-left: 24px;">
-                <span style="opacity: 0.7;">Asist/temp:</span>
-                <input type="number" class="number-input" data-key="assistsPerSeason" min="0" max="50">
+                <span style="opacity: 0.7;">Sube por temp:</span>
+                <input type="number" class="number-input" data-key="ovrPerSeason" min="0" max="20">
             </label>
             <label class="option">
                 <input type="checkbox" data-key="preventInjuries"> Prevenir lesiones

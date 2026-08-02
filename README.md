@@ -11,13 +11,15 @@ Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Normal+** (suma goles
 | Modo | Descripción |
 |------|-------------|
 | 🏆 **Modo Dios** | OVR siempre en 99, sin lesiones |
-| ⚽ **Modo Normal+** | Arranca con stats reales, suma goles/asist configurables cada temporada |
+| 📈 **Modo Normal+** | Sube X puntos de OVR cada temporada (parte de 50) |
 | ⚙️ **Personalizado** | Configurá cada opción a tu gusto |
 
 ### Opciones individuales
 
 - **OVR siempre en 99**: fuerza el overall a 99 constantemente
-- **Sumar goles/asist por temporada**: añade una cantidad fija de goles y asistencias a tus totales cada vez que avanzás una temporada (por defecto +10 goles y +5 asist)
+- **Subir OVR por temporada**: sube el OVR una cantidad fija cada temporada (ej: +5 por temporada, llegando a 99 en 10 temporadas)
+- **OVR inicial**: el OVR mínimo desde el que empieza la subida gradual (default 50)
+- **Sube por temp**: cuántos puntos suma por temporada (default 5)
 - **Prevenir lesiones**: cancela cualquier lesión activa
 
 ## 📋 Requisitos
@@ -55,15 +57,20 @@ El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la ca
 
 El bundle del juego tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 puntos críticos que limitan el OVR a un máximo de 99. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules.
 
+**Importante**: en este juego, el OVR **NO se calcula por goles ni por estadísticas**. Se calcula por las decisiones que tomás durante la carrera (eventos, lesiones, fichajes, etc.). Los goles son solo stats decorativas del resumen.
+
 **Este script evita todo eso** yendo directamente al Fiber de React:
 
 1. Busca el elemento `<div data-career-phase="...">` que renderiza la carrera
 2. Encuentra el Fiber de React asociado (mediante `__reactFiber$xxx`)
 3. Recorre los hooks `useState` buscando el que contiene `player.overall`
-4. Modifica el estado directamente: `player.overall`, `totals.goals`, `totals.assists`, etc.
+4. Modifica el estado directamente: `player.overall`, etc.
 5. Vuelve a aplicarlo cada 500 ms porque React reemplaza el estado en cada renderizado
 
-Para el **Modo Normal+**, el script detecta cuándo avanzás una temporada (cuando `state.seasons.length` aumenta) y suma una cantidad fija de goles y asist a tus totales. Esto hace que el OVR suba naturalmente por el cálculo interno del juego, sin necesidad de forzarlo a 99.
+### Modo Dios vs Modo Normal+
+
+- **Modo Dios**: `player.overall = 99` siempre, sin importar la temporada ni las decisiones
+- **Modo Normal+**: `player.overall = min(99, OVR_inicial + temporadas * puntos_por_temp)`. Ejemplo: con OVR inicial 50 y +5/temp, llegás a 99 en 10 temporadas.
 
 ## 📁 Estructura del repositorio
 
