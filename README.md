@@ -2,7 +2,7 @@
 
 Script de Tampermonkey con cheats configurables para el [Simulador de Carrera de Copero](https://copero.com.ar/juegos/simulador-carrera).
 
-Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Normal+** (suma goles y asist cada temporada). Todo configurable desde un panel flotante en el juego.
+Desarrollado por **Carliyo**. Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Realista** (el OVR sube hasta un pico y luego baja con la edad). Todo configurable desde un panel flotante en el juego.
 
 ## 🎯 Funcionalidades
 
@@ -10,17 +10,20 @@ Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Normal+** (suma goles
 
 | Modo | Descripción |
 |------|-------------|
-| 🏆 **Modo Dios** | OVR siempre en 99, sin lesiones |
-| 📈 **Modo Normal+** | Sube X puntos de OVR cada temporada (parte de 50) |
+| 🏆 **Modo Dios** | OVR siempre en 99, sin lesiones, sin importar la edad |
+| 📈 **Modo Realista** | El OVR sube gradualmente hasta el pico y luego baja con la edad |
 | ⚙️ **Personalizado** | Configurá cada opción a tu gusto |
 
 ### Opciones individuales
 
-- **OVR siempre en 99**: fuerza el overall a 99 constantemente
-- **Subir OVR por temporada**: sube el OVR una cantidad fija cada temporada (ej: +5 por temporada, llegando a 99 en 10 temporadas)
-- **OVR inicial**: el OVR mínimo desde el que empieza la subida gradual (default 50)
-- **Sube por temp**: cuántos puntos suma por temporada (default 5)
-- **Prevenir lesiones**: cancela cualquier lesión activa
+- **OVR siempre en 99**: fuerza el overall a 99 constantemente (Modo Dios)
+- **OVR basado en edad**: el OVR varía según la edad del jugador, simulando una carrera real
+  - **Pico OVR**: el OVR máximo al que llega en su mejor momento (por defecto 99)
+  - **Edad pico**: la edad en la que alcanza el pico (por defecto 28)
+  - **Sube/año**: cuántos puntos sube por año desde los 16 hasta el pico (por defecto 4)
+  - **Baja desde**: edad a partir de la cual empieza el declive (por defecto 31)
+  - **Baja/año**: cuántos puntos pierde por año después del declive (por defecto 2)
+- **Prevenir lesiones**: cancela cualquier lesión activa y reduce las sanciones a 0
 
 ## 📋 Requisitos
 
@@ -53,11 +56,11 @@ Dos modos simples: **Modo Dios** (OVR 99 siempre) y **Modo Normal+** (suma goles
 
 ## 🛠️ ¿Cómo funciona técnicamente?
 
-El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall` y `totals.*`) vive en el cierre del componente `CareerSimulatorPage`, no en `localStorage` ni en `window`.
+El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall`) vive en el cierre del componente, no en `localStorage` ni en `window`.
 
-El bundle del juego tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 puntos críticos que limitan el OVR a un máximo de 99. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules.
+El bundle del juego tiene un clamp duro `Math.max(40, Math.min(99, ...))` que limita el OVR. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules.
 
-**Importante**: en este juego, el OVR **NO se calcula por goles ni por estadísticas**. Se calcula por las decisiones que tomás durante la carrera (eventos, lesiones, fichajes, etc.). Los goles son solo stats decorativas del resumen.
+**Importante**: en este juego, el OVR **NO se calcula por goles ni por estadísticas**. Se calcula por las decisiones que tomás durante la carrera (eventos, lesiones, fichajes, etc.).
 
 **Este script evita todo eso** yendo directamente al Fiber de React:
 
@@ -67,10 +70,13 @@ El bundle del juego tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 p
 4. Modifica el estado directamente: `player.overall`, etc.
 5. Vuelve a aplicarlo cada 500 ms porque React reemplaza el estado en cada renderizado
 
-### Modo Dios vs Modo Normal+
+### Modo Dios vs Modo Realista
 
 - **Modo Dios**: `player.overall = 99` siempre, sin importar la temporada ni las decisiones
-- **Modo Normal+**: `player.overall = min(99, OVR_inicial + temporadas * puntos_por_temp)`. Ejemplo: con OVR inicial 50 y +5/temp, llegás a 99 en 10 temporadas.
+- **Modo Realista**: el OVR se calcula según la edad con la fórmula:
+  - Antes del pico: sube gradualmente desde 50 hasta el OVR del pico
+  - En el pico: OVR máximo
+  - Después del declive: baja `declinePerYear` puntos por año, sin bajar de 40
 
 ## 📁 Estructura del repositorio
 
@@ -90,13 +96,16 @@ copero-99-ovr/
 │ 🏆 Copero 99 OVR              ✕ │
 ├─────────────────────────────────┤
 │ Modo predefinido:              │
-│ [Modo Dios              ▼]    │
+│ [Realista                ▼]    │
 │                                  │
 │ Opciones:                        │
-│ ☑ OVR siempre en 99            │
-│ ☐ Sumar goles/asist por temp   │
-│   Goles/temp: [10]              │
-│   Asist/temp: [5]               │
+│ ☐ OVR siempre en 99            │
+│ ☑ OVR basado en edad           │
+│   Pico OVR: [99]                │
+│   Edad pico: [28]               │
+│   Sube/año: [4]                 │
+│   Baja desde: [31]              │
+│   Baja/año: [2]                 │
 │ ☑ Prevenir lesiones            │
 └─────────────────────────────────┘
 ```
@@ -118,3 +127,7 @@ Este script es **solo para uso educativo y de investigación**. El autor no se h
 ## 📝 Licencia
 
 MIT — consulta [`LICENSE`](./LICENSE) para más detalles.
+
+---
+
+Desarrollado por **Carliyo**.

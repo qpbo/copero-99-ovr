@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Copero 99 OVR
 // @namespace    copero-99-ovr
-// @version      2.0.0
-// @description  Cheats configurables para el Simulador de Carrera de Copero: OVR 99 y stats realistas
+// @version      2.1.0
+// @description  Cheats configurables para el Simulador de Carrera de Copero: OVR 99, progresion realista por edad, anti-lesiones
 // @author       contribuidores de copero-99-ovr
 // @match        https://copero.com.ar/juegos/simulador-carrera*
 // @grant        GM_setValue
@@ -15,18 +15,21 @@
     'use strict';
 
     // ========================================================================
-    // CONFIGURACIÓN
+    // CONFIGURACION
     // ========================================================================
 
     const DEFAULT_CONFIG = {
-        preset: 'god', // 'god' | 'normal' | 'custom'
+        preset: 'realistic', // 'god' | 'realistic' | 'custom'
 
         // Opciones individuales
-        forceOVR99: true,           // Modo Dios: OVR siempre en 99
-        gradualOVR: false,          // Modo Normal: subir OVR por temporada
-        ovrPerSeason: 5,            // Cuantos puntos sube por temporada
-        startingOVR: 50,            // OVR mínimo (no baja de aca)
-        preventInjuries: true,      // Cancelar lesiones
+        ageBasedOVR: true,        // OVR varia segun la edad (mas realista)
+        forceOVR99: false,        // Solo Modo Dios: OVR forzado a 99 siempre
+        peakOverall: 99,          // OVR maximo en el pico de carrera
+        peakAge: 28,              // Edad del pico
+        growthPerYear: 4,         // Cuantos puntos sube por año desde el inicio
+        declineStartAge: 31,      // Edad a partir de la cual empieza a bajar
+        declinePerYear: 2,        // Cuantos puntos baja por año despues del pico
+        preventInjuries: true,    // Cancelar lesiones
     };
 
     let config = { ...DEFAULT_CONFIG };
@@ -64,19 +67,28 @@
     const PRESETS = {
         god: {
             name: 'Modo Dios',
-            description: 'OVR siempre en 99, sin lesiones',
-            config: { ...DEFAULT_CONFIG, preset: 'god' }
-        },
-        normal: {
-            name: 'Modo Normal+',
-            description: 'Sube X puntos de OVR cada temporada (parte de 50)',
+            description: 'OVR siempre en 99, sin lesiones, sin importar edad',
             config: {
                 ...DEFAULT_CONFIG,
-                preset: 'normal',
+                preset: 'god',
+                forceOVR99: true,
+                ageBasedOVR: false,
+                preventInjuries: true,
+            }
+        },
+        realistic: {
+            name: 'Realista',
+            description: 'OVR crece hasta el pico y luego baja con la edad',
+            config: {
+                ...DEFAULT_CONFIG,
+                preset: 'realistic',
                 forceOVR99: false,
-                gradualOVR: true,
-                ovrPerSeason: 5,
-                startingOVR: 50,
+                ageBasedOVR: true,
+                peakOverall: 99,
+                peakAge: 28,
+                growthPerYear: 4,
+                declineStartAge: 31,
+                declinePerYear: 2,
                 preventInjuries: true,
             }
         },
@@ -137,33 +149,64 @@
     }
 
     // ========================================================================
-    // LÓGICA DEL PARCHE
+    // LOGICA DEL PARCHE
     // ========================================================================
 
-    let lastSeasonIndex = -1;
+    /**
+     * Calcula el OVR segun la edad del jugador.
+     * - Antes del pico: sube X puntos por año
+     * - En el pico: OVR maximo
+     * - Despues del pico: baja X puntos por año
+     */
+    function calculateOVR(age) {
+        const peak = config.peakOverall;
+        const peakAge = config.peakAge;
+        const declineAge = config.declineStartAge;
+        const growth = config.growthPerYear;
+        const decline = config.declinePerYear;
+
+        // Edad minima asumida: 16 (la del juego)
+        const startAge = 16;
+
+        if (age < peakAge) {
+            // Subiendo hacia el pico
+            const yearsToPeak = peakAge - age;
+            const totalYears = peakAge - startAge;
+            const progress = (age - startAge) / totalYears;
+            // Empieza bajo (el OVR del juego es 50 a los 16) y sube hasta el pico
+            return Math.min(peak, 50 + Math.round(progress * (peak - 50)));
+        } else if (age >= declineAge) {
+            // Bajando despues del pico
+            const yearsAfterDecline = age - declineAge;
+            const declineAmount = yearsAfterDecline * decline;
+            return Math.max(40, peak - declineAmount);
+        } else {
+            // En el pico
+            return peak;
+        }
+    }
 
     function patchCareerState(state) {
         if (!state || !state.player) return;
 
         const player = state.player;
-        const seasons = state.seasons || [];
-        const currentSeason = seasons.length || 0;
+        const age = player.age || 16;
 
-        // 1) OVR forzado a 99 (solo Modo Dios)
-        if (config.forceOVR99 && player.overall !== 99) {
-            player.overall = 99;
+        // 1) Modo Dios: OVR siempre en 99 (sin importar edad)
+        if (config.forceOVR99) {
+            if (player.overall !== 99) {
+                player.overall = 99;
+            }
+            return;
         }
 
-        // 2) OVR gradual (Modo Normal+)
-        // Sube X puntos por temporada, sin importar decisiones
-        if (config.gradualOVR) {
-            // Calculamos el OVR objetivo segun la temporada actual
-            const targetOVR = Math.min(99, config.startingOVR + (currentSeason * config.ovrPerSeason));
+        // 2) OVR basado en edad (mas realista)
+        if (config.ageBasedOVR) {
+            const targetOVR = calculateOVR(age);
 
-            if (player.overall < targetOVR) {
+            // Solo modificamos si difiere (para evitar forzar re-renders innecesarios)
+            if (player.overall !== targetOVR) {
                 player.overall = targetOVR;
-            } else if (player.overall > 99) {
-                player.overall = 99;
             }
         }
 
@@ -310,7 +353,7 @@
             <div class="section-title">Modo predefinido</div>
             <select class="preset-select" id="copero99-preset">
                 <option value="god">Modo Dios</option>
-                <option value="normal">Modo Normal+</option>
+                <option value="realistic">Realista</option>
                 <option value="custom">Personalizado</option>
             </select>
             <div class="section-title">Opciones</div>
@@ -318,26 +361,37 @@
                 <input type="checkbox" data-key="forceOVR99"> OVR siempre en 99
             </label>
             <label class="option">
-                <input type="checkbox" data-key="gradualOVR"> Subir OVR por temporada
+                <input type="checkbox" data-key="ageBasedOVR"> OVR basado en edad
             </label>
             <label class="option" style="padding-left: 24px;">
-                <span style="opacity: 0.7;">OVR inicial:</span>
-                <input type="number" class="number-input" data-key="startingOVR" min="40" max="99">
+                <span style="opacity: 0.7;">Pico OVR:</span>
+                <input type="number" class="number-input" data-key="peakOverall" min="40" max="99">
             </label>
             <label class="option" style="padding-left: 24px;">
-                <span style="opacity: 0.7;">Sube por temp:</span>
-                <input type="number" class="number-input" data-key="ovrPerSeason" min="0" max="20">
+                <span style="opacity: 0.7;">Edad pico:</span>
+                <input type="number" class="number-input" data-key="peakAge" min="16" max="40">
+            </label>
+            <label class="option" style="padding-left: 24px;">
+                <span style="opacity: 0.7;">Sube/año:</span>
+                <input type="number" class="number-input" data-key="growthPerYear" min="1" max="10">
+            </label>
+            <label class="option" style="padding-left: 24px;">
+                <span style="opacity: 0.7;">Baja desde:</span>
+                <input type="number" class="number-input" data-key="declineStartAge" min="25" max="40">
+            </label>
+            <label class="option" style="padding-left: 24px;">
+                <span style="opacity: 0.7;">Baja/año:</span>
+                <input type="number" class="number-input" data-key="declinePerYear" min="1" max="10">
             </label>
             <label class="option">
                 <input type="checkbox" data-key="preventInjuries"> Prevenir lesiones
             </label>
-            <div class="footer">v2.0.0 — arrastrar para mover</div>
+            <div class="footer">v2.1.0 — desarrollado por Carliyo</div>
         `;
 
         document.body.appendChild(menu);
         menuElement = menu;
 
-        // Botón flotante para reabrir
         const toggle = document.createElement('button');
         toggle.id = 'copero99-toggle';
         toggle.textContent = '🏆';
@@ -349,21 +403,17 @@
             toggle.style.display = 'none';
         });
 
-        // Cerrar
         menu.querySelector('.close-btn').addEventListener('click', () => {
             menu.style.display = 'none';
             toggle.style.display = 'block';
         });
 
-        // Drag
         makeDraggable(menu);
 
-        // Preset
         menu.querySelector('#copero99-preset').addEventListener('change', (e) => {
             applyPreset(e.target.value);
         });
 
-        // Checkboxes
         menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             cb.addEventListener('change', (e) => {
                 const key = e.target.dataset.key;
@@ -374,7 +424,6 @@
             });
         });
 
-        // Number inputs
         menu.querySelectorAll('input[type="number"]').forEach(input => {
             input.addEventListener('change', (e) => {
                 const key = e.target.dataset.key;
@@ -432,15 +481,14 @@
     }
 
     // ========================================================================
-    // INICIALIZACIÓN
+    // INICIALIZACION
     // ========================================================================
 
     loadConfig();
     createMenu();
 
-    console.log('[99] v2.0 cargado. Preset:', config.preset);
+    console.log('[99] v2.1 cargado. Preset:', config.preset);
 
-    // Loop principal cada 500ms
     let attempts = 0;
     const initInterval = setInterval(() => {
         attempts++;
