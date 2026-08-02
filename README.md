@@ -1,15 +1,32 @@
 # Copero 99 OVR
 
-Script de Tampermonkey que fuerza el OVR (overall) del jugador a 99 en el [Simulador de Carrera de Copero](https://copero.com.ar/juegos/simulador-carrera).
+Script de Tampermonkey con cheats configurables para el [Simulador de Carrera de Copero](https://copero.com.ar/juegos/simulador-carrera).
 
-Funciona modificando el estado de React del componente en tiempo de ejecución, sin necesidad de parchear el bundle ni instalar nada más aparte de Tampermonkey.
+Incluye OVR 99, progresión rápida, anti-lesiones, modo joven eterno, auto-decisión de eventos y mucho más. Todo configurable desde un panel flotante en el juego.
 
-## 🎯 ¿Qué hace?
+## 🎯 Funcionalidades
 
-- **Establece el OVR del jugador a 99** de forma constante
-- Se **vuelve a aplicar automáticamente** después de cada decisión (lesiones, eventos, fichajes, etc.)
-- **No rompe** otras mecánicas del juego (las lesiones, el envejecimiento y la progresión siguen funcionando, pero el OVR queda fijado en 99)
-- Es **indetectable** porque modifica el estado en memoria desde el cliente
+### Modos predefinidos
+
+| Modo | Descripción |
+|------|-------------|
+| 🏆 **Modo Dios** | OVR 99 desde el inicio, nunca lesionas, stats infladas |
+| 📈 **Realista +99** | Arranca con OVR bajo pero sube rápido temporada a temporada |
+| ⚽ **Goleador** | Stats infladas para que el OVR suba por cálculo natural |
+| 💀 **Inmortal** | Nunca te lesionás, stats infladas, OVR sube rápido |
+| 👶 **Joven Eterno** | Edad congelada en 16, OVR 99, stats infladas, sin retiro |
+| ⚙️ **Personalizado** | Configurá cada opción a tu gusto |
+
+### Opciones individuales
+
+- **OVR siempre en 99**: fuerza el overall a 99 constantemente
+- **Subida gradual por temporada**: el OVR sube +X puntos por temporada (más realista)
+- **Inflar stats (goles/asist)**: multiplica las estadísticas para que el OVR suba naturalmente
+- **Prevenir lesiones**: cancela cualquier lesión activa
+- **Prevenir retiro**: bloquea el evento de retiro
+- **Edad congelada**: mantiene la edad en 16 para siempre
+- **Auto-decidir eventos**: elige automáticamente la mejor opción en cada decisión
+- **Forzar outcomes positivos**: sesga las decisiones hacia resultados favorables
 
 ## 📋 Requisitos
 
@@ -35,24 +52,21 @@ Funciona modificando el estado de React del componente en tiempo de ejecución, 
 ### 3. Juega
 
 1. Ve a `https://copero.com.ar/juegos/simulador-carrera`
-2. Inicia una nueva carrera
-3. Elige tu identidad y empieza a jugar
-4. Tu OVR estará en 99 (y se quedará en 99 incluso después de lesiones o malas decisiones)
+2. **Aparecerá un panel flotante** en la esquina superior derecha con los controles
+3. Elige un modo predefinido o configura las opciones a tu gusto
+4. Inicia una nueva carrera
+5. El panel se puede arrastrar y cerrar (vuelve a aparecer con el botón 🏆)
 
 ## 🔍 Comprobar que funciona
 
 1. Abre DevTools (`F12` o `Cmd+Opt+I`)
 2. Ve a la pestaña **Consola**
-3. Deberías ver algo como:
-   ```
-   [99] RE-REAL-FINAL cargado
-   [99] PATCH aplicado en intento #3
-   ```
-4. Si tu OVR empieza en 99, todo está funcionando 🎉
+3. Deberías ver: `[99] v2.0 cargado. Config: ...`
+4. El panel flotante debe aparecer en la esquina superior derecha
 
 ## 🛠️ ¿Cómo funciona técnicamente?
 
-El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall`) vive en el cierre del componente `CareerSimulatorPage`, no en `localStorage` ni en `window`.
+El Simulador de Carrera de Copero es una SPA de React + Vite. El estado de la carrera (incluyendo el `player.overall`, `player.age`, `totals.*`) vive en el cierre del componente `CareerSimulatorPage`, no en `localStorage` ni en `window`.
 
 El bundle del juego (`CareerSimulatorPage-EiQXNFBI.js`) tiene un clamp duro `Math.max(40, Math.min(99, ...))` en 4 puntos críticos que limitan el OVR a un máximo de 99. Parchear el bundle desde la consola es muy difícil porque el módulo se carga mediante `import()` nativo de ES modules, que no pasa por `window.fetch`.
 
@@ -61,10 +75,14 @@ El bundle del juego (`CareerSimulatorPage-EiQXNFBI.js`) tiene un clamp duro `Mat
 1. Busca el elemento `<div data-career-phase="...">` que renderiza la carrera
 2. Encuentra el Fiber de React asociado (mediante `__reactFiber$xxx`)
 3. Recorre los hooks `useState` buscando el que contiene `player.overall`
-4. Establece `player.overall = 99` directamente en el `memoizedState`
+4. Modifica el estado directamente: `player.overall`, `player.age`, `totals.*`, etc.
 5. Vuelve a aplicarlo cada 500 ms porque React reemplaza el estado en cada renderizado
 
-Este enfoque es **mucho más fiable** que parchear el bundle porque toca el estado real de React.
+Además, el script:
+
+- Construye un panel UI flotante inyectando HTML y CSS al DOM
+- Persiste la configuración del usuario en `localStorage` (compatible con `GM_setValue`)
+- Detecta eventos automáticamente y elige la mejor opción según heurística
 
 ## 📁 Estructura del repositorio
 
@@ -77,9 +95,32 @@ copero-99-ovr/
 └── .gitignore
 ```
 
+## 🎮 Capturas de pantalla
+
+### Panel flotante
+
+```
+┌─────────────────────────────────┐
+│ 🏆 Copero 99 OVR              ✕ │
+├─────────────────────────────────┤
+│ Modo predefinido:              │
+│ [Modo Dios              ▼]    │
+│                                  │
+│ Opciones:                        │
+│ ☑ OVR siempre en 99            │
+│ ☐ Subida gradual por temporada │
+│ ☑ Inflar stats (goles/asist)   │
+│ ☑ Prevenir lesiones            │
+│ ☑ Prevenir retiro              │
+│ ☐ Edad congelada               │
+│ ☑ Auto-decidir eventos         │
+│ ☑ Forzar outcomes positivos    │
+└─────────────────────────────────┘
+```
+
 ## ⚠️ Aviso
 
-Este script es **solo para uso educativo y de investigación**. El autor no se hace responsable del uso que se le dé. Jugar con el OVR modificado puede arruinarte la experiencia del juego si eso es lo que buscas.
+Este script es **solo para uso educativo y de investigación**. El autor no se hace responsable del uso que se le dé. Jugar con trampas puede arruinarte la experiencia del juego si eso es lo que buscas.
 
 ## 🤝 Contribuciones
 
