@@ -3,7 +3,7 @@
 // @namespace    copero-99-ovr
 // @version      1.0.0
 // @description  Fuerza el OVR del jugador a 99 en el Simulador de Carrera de Copero
-// @author       contribuidores de copero-99-ovr
+// @author       Carliyo
 // @match        https://copero.com.ar/juegos/simulador-carrera*
 // @grant        none
 // @run-at       document-idle
