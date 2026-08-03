@@ -3,7 +3,7 @@
 // @namespace    copero-99-ovr
 // @version      2.1.0
 // @description  Cheats configurables para el Simulador de Carrera de Copero: OVR 99, progresion realista por edad, anti-lesiones
-// @author       contribuidores de copero-99-ovr
+// @author       Carliyo
 // @match        https://copero.com.ar/juegos/simulador-carrera*
 // @grant        GM_setValue
 // @grant        GM_getValue
